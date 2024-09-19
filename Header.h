@@ -29,3 +29,4 @@ double l2_norm_square(vector<double>& x);
 Fredholm Fredholm11();
 Fredholm Fredholm12();
 Fredholm Fredholm17();
+Fredholm Fredholm18();

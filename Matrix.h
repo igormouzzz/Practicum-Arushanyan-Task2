@@ -1,5 +1,5 @@
 #include "Header.h"
-
+#include "Task.h"
 using row = vector<double>;
 
 class Matrix
@@ -28,8 +28,8 @@ public:
 
 	void Move(vector<row> rows);
 	
-	vector<double> Gauss(vector<double>& b);
+	vector<double> Gauss(vector<double> b);
 
-	friend class Vector;
+	friend void Task::Count2(double (*K)(double x, double t), double (*f)(double x), const double a, const double b, vector<double>& cn, vector<double>& Un, vector<double>& tn, const int i, Matrix& Mat_glob, vector<double>& F_glob);
 	friend ostream& operator<<(ostream& cout, const Matrix& b);
 };

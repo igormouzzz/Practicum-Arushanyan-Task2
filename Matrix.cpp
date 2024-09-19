@@ -235,7 +235,7 @@ void Matrix::Move(vector<row> rows)
 	}
 }
 
-vector<double> Matrix::Gauss(vector<double>& b)
+vector<double> Matrix::Gauss(vector<double> b)
 {
 	if (l2_norm_square(b) < 1e-30) { cout << "<" << endl; return vector<double>(b.size()); }
 
@@ -289,6 +289,6 @@ ostream& operator<<(ostream& cout, const Matrix& b)
 		}
 		cout << endl;
 	}
-	cout << endl << endl;
+	cout << endl;
 	return cout;
 }

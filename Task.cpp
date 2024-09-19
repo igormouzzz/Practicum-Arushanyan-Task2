@@ -3,17 +3,14 @@
 #include "Fredholm.h"
 #define N 1000000
 
-void Task::Count(double (*K)(double x, double t), double (*f)(double x), const double a, const double b, vector<double>& cn, vector<double>& Un, vector<double>& tn, const int i)
+void Task::Count(double (*K)(double x, double t), double (*f)(double x), const double alpha, const double beta, vector<double>& cn, vector<double>& Un, vector<double>& tn, const int k)
 {
-	vector<double> c = { (b-a)/6.0, 4.0*(b-a)/6.0, (b-a)/6.0 };
+	vector<double> c = { (beta - alpha)/6.0, 4.0*(beta - alpha)/6.0, (beta - alpha)/6.0 };
 	vector<double> U(3);
-	vector<double> t = { a, (a+b)/2.0, b };
-	for(auto& tt: t) cout<<f(tt)<<" "; cout<<endl;
-	cout << "c = " << c;
-	cout << "[a,b] = [" << a << ", " << b << "]" << endl << endl;
-
-	cn[1+2*i] = c[1]; cn[1+2*i+1] = c[2];
-	tn[1+2*i] = t[1]; tn[1+2*i+1] = t[2];
+	vector<double> t = { alpha, (alpha + beta)/2.0, beta };
+	//cout << "c = " << c; 
+	cn[1+2*k] = c[1]; cn[1+2*k+1] = c[2];
+	tn[1+2*k] = t[1]; tn[1+2*k+1] = t[2];
 
 	vector<vector<double>> m(3, vector<double>(3));
 	for (int i = 0; i < 3; i++)
@@ -25,12 +22,35 @@ void Task::Count(double (*K)(double x, double t), double (*f)(double x), const d
 		}
 	}
 	Matrix M(m);
+	//cout << M;
 	vector<double> F(3);
 	for (int i = 0; i < 3; i++) F[i] = f(t[i]);
 	U = M.Gauss(F);
-	//if (i == 0) Un[0] = U[0];
-	Un[2*i] += U[0];
-	Un[1+2*i] += U[1]; Un[1+2*i+1] += U[2];
+	//cout << "U = " << U;
+	if (k == 0) Un[0] = U[0];
+	Un[1+2*k] = U[1]; Un[1+2*k+1] = U[2];
+}
+
+void Task::Count2(double (*K)(double x, double t), double (*f)(double x), const double alpha, const double beta, vector<double>& cn, vector<double>& Un, vector<double>& tn, const int k, Matrix& Mat_glob, vector<double>& F_glob)
+{
+	vector<double> c = { (beta - alpha) / 6.0, 4.0 * (beta - alpha) / 6.0, (beta - alpha) / 6.0 };
+	vector<double> t = { alpha, (alpha + beta) / 2.0, beta };
+	//cout << "c = " << c;
+	cn[1+2*k] += c[1]; cn[1+2*k+1] += c[2];
+	tn[1+2*k] = t[1]; tn[1+2*k+1] = t[2];
+
+	vector<double> F(3);
+	for (int i = 0; i < 3; i++) F[i] = f(t[i]);
+	for (int i = 0; i < 3; i++) F_glob[2*k+i] += F[i];
+
+	for (int i = 0; i < 3; i++)
+	{
+		Mat_glob.a[2*k+i][2*k+i] += 1;
+		for (int j = 0; j < 3; j++)
+		{
+			Mat_glob.a[2*k+i][2*k+j] -= c[j] * K(t[i], t[j]);
+		}
+	}
 }
 
 double Task::Integral(std::function<double(double)> f, double a, double b, double n, double epsilon)
@@ -99,14 +119,13 @@ double Task::L2_norm_sqr(std::function<double(double)> g, const double a, const 
 
 void Task::main_func()
 {
-	Fredholm Eq = Fredholm11();
+	Fredholm Eq = Fredholm17();
 	double a = Eq.a, b = Eq.b;
 	//double (*u)(double x) = Eq.u;
 	double (*K)(double x, double t) = Eq.K;
 	double (*f)(double x) = Eq.f;
-	const double epsilon = 1e-8;
+	const double epsilon = 1e-4;
 	int n = 1 + 2*1;
-	//int n1, n2;
 	int num_of_subsegments = (n-1)/2;
 
 	vector<double> cn1, cn2;
@@ -116,6 +135,7 @@ void Task::main_func()
 	cn2.resize(n); Un2.resize(n); tn2.resize(n);
 	cn2[0] = (b-a)/6.0; tn2[0] = a;
 	double alpha = a, beta = a + (b-a)/ num_of_subsegments;
+	
 	for (int i = 0; i < num_of_subsegments; i++)
 	{
 		Count(K, f, alpha, beta, cn2, Un2, tn2, i);
@@ -139,17 +159,22 @@ void Task::main_func()
 		};
 		n = 1 + (n - 1) * 2;
 		num_of_subsegments = (n - 1) / 2;
+		Matrix Mat_glob(n, n);
+		vector<double> F_glob(n);
 		cn2.resize(n); Un2.resize(n); tn2.resize(n);
 		double alpha = a, beta = a + (b - a) / num_of_subsegments;
-		cn2[0] = (beta - alpha) / 6.0; tn2[0] = a;
-		for (int i = 0; i < num_of_subsegments; i++)
+		cn2[0] = (beta-alpha)/6.0; //???
+		cn2[0] = 1.0/6.0; tn2[0] = a;
+		for (int k = 0; k < num_of_subsegments; k++)
 		{
-			Count(K, f, alpha, beta, cn2, Un2, tn2, i);
+			//Count(K, f, alpha, beta, cn2, Un2, tn2, k);
+			Count2(K, f, alpha, beta, cn2, Un2, tn2, k, Mat_glob, F_glob);
 			alpha = beta; beta += (b - a) / num_of_subsegments;
 		}
-		cout << cn2;
-		cout << Un2;
-		cout << tn2;
+		cout << "F_glob = " << F_glob << endl;
+		cout << Mat_glob;
+		Un2 = Mat_glob.Gauss(F_glob);
+		//cout << "Un2 = " << Un2;
 		u2n = [&](double x) {
 			double S(0.0);
 			for (int j = 0; j < cn2.size(); j++) S += cn2[j] * K(x, tn2[j]) * Un2[j];
@@ -160,14 +185,16 @@ void Task::main_func()
 		diff = [&](double x) { 
 			return un(x) - u2n(x); 
 		};
-		cout << Integral(un, a, b, n, epsilon) << "\t" << Integral(u2n, a, b, n, epsilon) << endl;
+		//cout << Integral(un, a, b, n, epsilon) << "\t" << Integral(u2n, a, b, n, epsilon) << endl;
 		//cout << diff(0.2) << " " << diff(0.4) << " " << diff(0.6) << "" << diff(0.8) << " " << diff(1.0) << endl;
 		cout << L2_norm_sqr(diff, a, b, epsilon) << endl;
 	} 
 	while ( L2_norm_sqr(diff, a, b, epsilon) > epsilon && 0 > 1);
 
 	ofstream out("out.txt");
+	for (auto& tt : tn1) out << tt << " "; out << endl;
+	for (auto& tt : tn1) out << un(tt) << " "; out << endl;
 	for (auto& tt : tn2) out << tt << " "; out << endl;
-	for (auto& tt : tn2) out << un(tt) << " "; out << endl;
-	//system("python script.py");
+	for (auto& tt : tn2) out << u2n(tt) << " "; out << endl;
+	system("python script.py");
 }
