@@ -1,54 +1,29 @@
-#include "Task.h"
+﻿#include "Task.h"
 #include "Matrix.h"
 #include "Fredholm.h"
 #define N 1000000
 
-void Task::Count(double (*K)(double x, double t), double (*f)(double x), const double alpha, const double beta, vector<double>& cn, vector<double>& Un, vector<double>& tn, const int k)
-{
-	vector<double> c = { (beta - alpha)/6.0, 4.0*(beta - alpha)/6.0, (beta - alpha)/6.0 };
-	vector<double> U(3);
-	vector<double> t = { alpha, (alpha + beta)/2.0, beta };
-	//cout << "c = " << c; 
-	cn[1+2*k] = c[1]; cn[1+2*k+1] = c[2];
-	tn[1+2*k] = t[1]; tn[1+2*k+1] = t[2];
-
-	vector<vector<double>> m(3, vector<double>(3));
-	for (int i = 0; i < 3; i++)
-	{
-		m[i][i] = 1;
-		for (int j = 0; j < 3; j++)
-		{
-			m[i][j] -= c[j] * K(t[i], t[j]);
-		}
-	}
-	Matrix M(m);
-	//cout << M;
-	vector<double> F(3);
-	for (int i = 0; i < 3; i++) F[i] = f(t[i]);
-	U = M.Gauss(F);
-	//cout << "U = " << U;
-	if (k == 0) Un[0] = U[0];
-	Un[1+2*k] = U[1]; Un[1+2*k+1] = U[2];
-}
-
-void Task::Count2(double (*K)(double x, double t), double (*f)(double x), const double alpha, const double beta, vector<double>& cn, vector<double>& Un, vector<double>& tn, const int k, Matrix& Mat_glob, vector<double>& F_glob)
+void Task::Count(double (*K)(double x, double t), double (*f)(double x), const double alpha, const double beta, vector<double>& cn, vector<double>& Un, vector<double>& tn, const int k, Matrix& Mat_glob, vector<double>& F_glob)
 {
 	vector<double> c = { (beta - alpha) / 6.0, 4.0 * (beta - alpha) / 6.0, (beta - alpha) / 6.0 };
 	vector<double> t = { alpha, (alpha + beta) / 2.0, beta };
-	//cout << "c = " << c;
+	if (k == 0) tn[0] = t[0];
+	cn[2*k] += c[0];
 	cn[1+2*k] += c[1]; cn[1+2*k+1] += c[2];
 	tn[1+2*k] = t[1]; tn[1+2*k+1] = t[2];
 
-	vector<double> F(3);
-	for (int i = 0; i < 3; i++) F[i] = f(t[i]);
-	for (int i = 0; i < 3; i++) F_glob[2*k+i] += F[i];
+	for (int i = 0; i < 3; i++) F_glob[2*k+i] += f(t[i]);
+}
 
-	for (int i = 0; i < 3; i++)
+void Task::FillMatrix(double (*K)(double x, double t), double (*f)(double x), const vector<double>& cn, const vector<double>& tn, Matrix& Mat_glob)
+{
+	int n = Mat_glob.a.size();
+	for (int i = 0; i < n; i++)
 	{
-		Mat_glob.a[2*k+i][2*k+i] += 1;
-		for (int j = 0; j < 3; j++)
+		Mat_glob.a[i][i] += 1.0;
+		for (int j = 0; j < n; j++)
 		{
-			Mat_glob.a[2*k+i][2*k+j] -= c[j] * K(t[i], t[j]);
+			Mat_glob.a[i][j] -= cn[j] * K(tn[i], tn[j]);
 		}
 	}
 }
@@ -119,12 +94,14 @@ double Task::L2_norm_sqr(std::function<double(double)> g, const double a, const 
 
 void Task::main_func()
 {
-	Fredholm Eq = Fredholm17();
+	Fredholm Eq = Fredholm11();
 	double a = Eq.a, b = Eq.b;
-	//double (*u)(double x) = Eq.u;
+	double (*u)(double x) = Eq.u;
 	double (*K)(double x, double t) = Eq.K;
 	double (*f)(double x) = Eq.f;
-	const double epsilon = 1e-4;
+	const double epsilon = 1e-3; cout << "epsilon = " << epsilon << endl << endl;
+	double norm;
+	int n_prev;
 	int n = 1 + 2*1;
 	int num_of_subsegments = (n-1)/2;
 
@@ -132,16 +109,21 @@ void Task::main_func()
 	vector<double> Un1, Un2;
 	vector<double> tn1, tn2;
 
+	Matrix Mat_glob(n, n);
+	vector<double> F_glob(n);
+
 	cn2.resize(n); Un2.resize(n); tn2.resize(n);
-	cn2[0] = (b-a)/6.0; tn2[0] = a;
+	tn2[0] = a;
 	double alpha = a, beta = a + (b-a)/ num_of_subsegments;
-	
-	for (int i = 0; i < num_of_subsegments; i++)
+	for (int k = 0; k < num_of_subsegments; k++)
 	{
-		Count(K, f, alpha, beta, cn2, Un2, tn2, i);
+		Count(K, f, alpha, beta, cn2, Un2, tn2, k, Mat_glob, F_glob);
 		alpha = beta; beta += (b-a)/ num_of_subsegments;
 	}
-	//cout << Un2 << endl;
+	FillMatrix(K, f, cn2, tn2, Mat_glob);
+	
+	Un2 = Mat_glob.Gauss(F_glob);
+	cout << "Un2 = " << Un2;
 	std::function<double(double)> un, u2n;
 	u2n = [&](double x) {
 		double S(0.0); 
@@ -151,45 +133,46 @@ void Task::main_func()
 	std::function<double(double)> diff;
 	do
 	{
-		cn1 = std::move(cn2); Un1 = std::move(Un2); tn1 = std::move(tn2);
+		cn1 = std::move(cn2); Un1 = std::move(Un2); tn1 = std::move(tn2); F_glob.clear();
 		un = [&](double x) {
 			double S(0.0);
 			for (int j = 0; j < cn1.size(); j++) S += cn1[j] * K(x, tn1[j]) * Un1[j];
 			return S + f(x);
 		};
-		n = 1 + (n - 1) * 2;
+		n_prev = n;
+		n = 1 + (n-1)*2;
 		num_of_subsegments = (n - 1) / 2;
-		Matrix Mat_glob(n, n);
-		vector<double> F_glob(n);
+		Mat_glob = Matrix(n, n);
 		cn2.resize(n); Un2.resize(n); tn2.resize(n);
+		F_glob.resize(n);
 		double alpha = a, beta = a + (b - a) / num_of_subsegments;
-		cn2[0] = (beta-alpha)/6.0; //???
-		cn2[0] = 1.0/6.0; tn2[0] = a;
 		for (int k = 0; k < num_of_subsegments; k++)
 		{
-			//Count(K, f, alpha, beta, cn2, Un2, tn2, k);
-			Count2(K, f, alpha, beta, cn2, Un2, tn2, k, Mat_glob, F_glob);
+			Count(K, f, alpha, beta, cn2, Un2, tn2, k, Mat_glob, F_glob);
 			alpha = beta; beta += (b - a) / num_of_subsegments;
 		}
-		cout << "F_glob = " << F_glob << endl;
-		cout << Mat_glob;
+		for (int k = 1; k < (n-1)/2; k++) F_glob[2*k] /= 2.0;
+		FillMatrix(K, f, cn2, tn2, Mat_glob);
 		Un2 = Mat_glob.Gauss(F_glob);
-		//cout << "Un2 = " << Un2;
 		u2n = [&](double x) {
 			double S(0.0);
 			for (int j = 0; j < cn2.size(); j++) S += cn2[j] * K(x, tn2[j]) * Un2[j];
 			return S + f(x);
 		};
-		cout << un(0.25) << " " << un(1.0) << endl;
-		cout << u2n(0.25) << " " << u2n(1.0) << endl << endl;
 		diff = [&](double x) { 
 			return un(x) - u2n(x); 
 		};
-		//cout << Integral(un, a, b, n, epsilon) << "\t" << Integral(u2n, a, b, n, epsilon) << endl;
-		//cout << diff(0.2) << " " << diff(0.4) << " " << diff(0.6) << "" << diff(0.8) << " " << diff(1.0) << endl;
-		cout << L2_norm_sqr(diff, a, b, epsilon) << endl;
+		norm = L2_norm_sqr(diff, a, b, epsilon);
+		cout << "n = " << n_prev << endl;
+		cout << "\t||un-u2n|| = "<< sqrt(norm) << endl;
 	} 
-	while ( L2_norm_sqr(diff, a, b, epsilon) > epsilon && 0 > 1);
+	while (norm > epsilon * epsilon && 0 > -1); cout << "n = " << n << endl;
+	
+	diff = [&](double x) {
+		return u(x) - u2n(x);
+	};
+	norm = L2_norm_sqr(diff, a, b, epsilon); 
+	cout << "\t||u-u2n|| = " << sqrt(norm) << endl;
 
 	ofstream out("out.txt");
 	for (auto& tt : tn1) out << tt << " "; out << endl;

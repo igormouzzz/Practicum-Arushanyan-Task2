@@ -26,6 +26,8 @@ class Fredholm;
 
 double l2_norm_square(vector<double>& x);
 
+Fredholm Fredholm01();
+Fredholm Fredholm02();
 Fredholm Fredholm11();
 Fredholm Fredholm12();
 Fredholm Fredholm17();

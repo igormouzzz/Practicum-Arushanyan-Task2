@@ -58,6 +58,26 @@ Matrix& Matrix::operator=(const Matrix& b)
 	}
 	return *this;
 }
+Matrix& Matrix::operator=(Matrix&& b) noexcept
+{
+	if (this != &b)
+	{
+		a.clear();
+		N = b.N;
+		M = b.M;
+		a.resize(N);
+		for (int i = 0; i < N; i++) a[i].resize(M);
+		for (int i = 0; i < N; i++)
+		{
+			for (int j = 0; j < M; j++)
+			{
+				a[i][j] = b.a[i][j];
+			}
+		}
+		b.N = b.M = 0; b.a.clear();
+	}
+	return *this;
+}
 Matrix Matrix::operator+(const Matrix& b)
 {
 	if ((N != b.N) || (M != b.M))
@@ -235,6 +255,16 @@ void Matrix::Move(vector<row> rows)
 	}
 }
 
+void Matrix::SetZero()
+{
+	for (int i = 0; i < N; i++) std::fill(a[i].begin(), a[i].end(), 0.0);
+}
+
+void Matrix::Clean()
+{
+	a.clear(); N = M = 0;
+}
+
 vector<double> Matrix::Gauss(vector<double> b)
 {
 	if (l2_norm_square(b) < 1e-30) { cout << "<" << endl; return vector<double>(b.size()); }
@@ -276,6 +306,41 @@ vector<double> Matrix::Gauss(vector<double> b)
 		x[i] = (b[i] - sum) / a[i][i];
 	}
 
+	return x;
+}
+
+vector<double> Matrix::Jacobi(vector<double>& b, const double epsilon)
+{
+	int max_iter = 2*N;
+	int n = N;
+	vector<double> x(n);
+	vector<double> x_new(n);
+
+	for (int iter = 0; iter < max_iter; ++iter) {
+		for (int i = 0; i < n; ++i) {
+			double sum = 0.0;
+			for (int j = 0; j < n; ++j) {
+				if (i != j) {
+					sum += a[i][j] * x[j];
+				}
+			}
+			x_new[i] = (b[i] - sum) / a[i][i];
+		}
+
+		// Проверка на сходимость
+		double norm = 0.0;
+		for (int i = 0; i < n; ++i) {
+			norm += pow(x_new[i] - x[i], 2);
+		}
+		norm = sqrt(norm);
+
+		if (norm < epsilon) 
+		{
+			break;
+		}
+
+		x = x_new;
+	}
 	return x;
 }
 

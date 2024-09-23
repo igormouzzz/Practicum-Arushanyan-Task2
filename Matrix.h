@@ -16,6 +16,7 @@ public:
 	size_t GetM();
 	void SetValue(int i, int j, double value);
 	Matrix& operator=(const Matrix& b);
+	Matrix& operator=(Matrix&& b) noexcept;
 	Matrix operator+(const Matrix& b);
 	Matrix operator-(const Matrix& b);
 	Matrix operator*(double k);
@@ -27,9 +28,13 @@ public:
 	void Inversed(Matrix& Inv);
 
 	void Move(vector<row> rows);
-	
-	vector<double> Gauss(vector<double> b);
+	void SetZero();
+	void Clean();
 
-	friend void Task::Count2(double (*K)(double x, double t), double (*f)(double x), const double a, const double b, vector<double>& cn, vector<double>& Un, vector<double>& tn, const int i, Matrix& Mat_glob, vector<double>& F_glob);
+	vector<double> Gauss(vector<double> b);
+	vector<double> Jacobi(vector<double>& b, const double epsilon);
+
+	friend void Task::Count(double (*K)(double x, double t), double (*f)(double x), const double a, const double b, vector<double>& cn, vector<double>& Un, vector<double>& tn, const int i, Matrix& Mat_glob, vector<double>& F_glob);
+	friend void Task::FillMatrix(double (*K)(double x, double t), double (*f)(double x), const vector<double>& cn, const vector<double>& tn, Matrix& Mat_glob);
 	friend ostream& operator<<(ostream& cout, const Matrix& b);
 };
