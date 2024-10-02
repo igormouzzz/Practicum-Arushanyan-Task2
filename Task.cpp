@@ -99,8 +99,8 @@ void Task::main_func()
 	double (*u)(double x) = Eq.u;
 	double (*K)(double x, double t) = Eq.K;
 	double (*f)(double x) = Eq.f;
-	const double epsilon = 1e-3; cout << "epsilon = " << epsilon << endl << endl;
-	double norm;
+	const double epsilon = 1e-1; cout << "epsilon = " << epsilon << endl << endl;
+	double norm_sqr;
 	int n_prev;
 	int n = 1 + 2*1;
 	int num_of_subsegments = (n-1)/2;
@@ -123,7 +123,7 @@ void Task::main_func()
 	FillMatrix(K, f, cn2, tn2, Mat_glob);
 	
 	Un2 = Mat_glob.Gauss(F_glob);
-	cout << "Un2 = " << Un2;
+	//cout << "Un2 = " << Un2;
 	std::function<double(double)> un, u2n;
 	u2n = [&](double x) {
 		double S(0.0); 
@@ -131,6 +131,7 @@ void Task::main_func()
 		return S + f(x);
 	};
 	std::function<double(double)> diff;
+
 	do
 	{
 		cn1 = std::move(cn2); Un1 = std::move(Un2); tn1 = std::move(tn2); F_glob.clear();
@@ -162,21 +163,21 @@ void Task::main_func()
 		diff = [&](double x) { 
 			return un(x) - u2n(x); 
 		};
-		norm = L2_norm_sqr(diff, a, b, epsilon);
+		norm_sqr = L2_norm_sqr(diff, a, b, epsilon);
 		cout << "n = " << n_prev << endl;
-		cout << "\t||un-u2n|| = "<< sqrt(norm) << endl;
+		cout << "\t||un-u2n|| = "<< sqrt(norm_sqr) << endl;
 	} 
-	while (norm > epsilon * epsilon && 0 > -1); cout << "n = " << n << endl;
+	while (norm_sqr > epsilon * epsilon && 0 > -1); cout << "n = " << n << endl;
 	
 	diff = [&](double x) {
 		return u(x) - u2n(x);
 	};
-	norm = L2_norm_sqr(diff, a, b, epsilon); 
-	cout << "\t||u-u2n|| = " << sqrt(norm) << endl;
+	norm_sqr = L2_norm_sqr(diff, a, b, epsilon);
+	cout << "\t||u-u2n|| = " << sqrt(norm_sqr) << endl;
 
 	ofstream out("out.txt");
-	for (auto& tt : tn1) out << tt << " "; out << endl;
-	for (auto& tt : tn1) out << un(tt) << " "; out << endl;
+	//for (auto& tt : tn1) out << tt << " "; out << endl;
+	//for (auto& tt : tn1) out << un(tt) << " "; out << endl;
 	for (auto& tt : tn2) out << tt << " "; out << endl;
 	for (auto& tt : tn2) out << u2n(tt) << " "; out << endl;
 	system("python script.py");
